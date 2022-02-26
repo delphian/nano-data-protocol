@@ -16,6 +16,7 @@
   "author": "Bryan Hazelbaker",
   "license": "MIT",
   "dependencies": {
+    "axios": "^0.26.0",
     "pad": "^3.2.0",
     "qrcode": "^1.5.0"
   }
