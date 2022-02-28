@@ -52,6 +52,16 @@ exports.nData = function(config) {
 	        }
         	return raw;
 	};
+	this.encodeMeta00QRDataAsync = function(account, data) {
+		let promise = new Promise((resolve, reject) => {
+			this.qrcode.toDataURL(`nano:${account}?amount=${data}`, function (err, url) {
+				if (err)
+					reject(err);
+				resolve(url);
+			});
+		});
+		return promise;
+	};
 	this.encodeQRCode = function(account, data, filename, options) {
 	        this.qrcode.toFile(
         	        filename,
@@ -116,6 +126,8 @@ exports.nData = function(config) {
 	 * @returns	{String} 		Data encoded as nano amount
 	 */
 	this.encodeSegments = function(characters) {
+		if (typeof characters != 'string')
+			throw "Required parameter 'characters' must be of type String";
 		let encoded = "";
 		for (let x = 0; x < characters.length; x++) {
 			encoded += this.encodeSegment(characters[x]);
@@ -131,8 +143,9 @@ exports.nData = function(config) {
          * @returns     {String}                Decoded amount from numbers to base data characters
          */
 	this.decodeSegmentsAll = function(amount) {
-		if (amount % 2 !== 0)
-			throw "Bytes not aligned to segments";
+		if (amount.length % 2 !== 0)
+			amount = `0${amount}`;
+//			throw "Bytes not aligned to segments";
 		return this.decodeSegments(amount, (amount.toString().length / 2), amount.toString().length / 2);
 	};
 	this.decodeMeta = function(amount) {
@@ -149,10 +162,42 @@ exports.nData = function(config) {
 	 * @param	{String} data		Data to encode.
 	 * @returns	{String}		Raw nano amount.
 	 */
-	this.encodeMeta00 = function(account, data) {
+	this.encodeMessage00 = function(account, data) {
+		if (typeof account != 'string')
+			throw "Required paramter 'account' must be of type String";
 		let amount = `${this.encodeSegments(data)}00${this.encodeSegments(account.substr(-6))}`;
 		return amount;
 	};
+	/**
+	 * Encode single part raw data to a QR code
+	 * @param	{String} account	Destination account address.
+	 * @param	{String} data		Data to encode.
+	 * @returns	{Object}		Encoded message..
+	 * 			 o.qr		QR code in URL string format of address and amount in NANO.
+	 *			 o.account	Account address embeded in QR.
+	 *			 o.data		Encoded data embeded in amount.
+	 *			 o.raw		Transaction amount in raw.
+	 *			 o.amount	Transaction amount in NANO.
+	 */
+        this.encodeMessageAsync = function(account, data) {
+                let promise = new Promise((resolve, reject) => {
+			let raw = this.encodeMessage00(account, data);
+			let amount = this.getNANO(raw);
+                        this.qrcode.toDataURL(`nano:${account}?amount=${amount}`, function (err, url) {
+                                if (err)
+                                        reject(err);
+				else
+	                                resolve({
+						qr: url,
+						account: account,
+						data: data,
+						raw: raw,
+						amount: amount
+					});
+                        });
+                });
+                return promise;
+        };
 	/**
 	 * Determine if the amount specified indicates a meta packet
 	 * @param	{String} amount		Complete amount
