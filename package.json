@@ -1,22 +1,27 @@
 {
-  "name": "nano-data-protocol",
+  "name": "nano-data-tools",
   "version": "1.0.0",
-  "description": "NANO data protocol",
-  "main": "nano-data-protocol.js",
+  "description": "NANO data tools",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "NANO",
     "crypto",
+    "currency",
     "data",
     "packets",
-    "information"
+    "information",
+    "protocol"
   ],
   "author": "Bryan Hazelbaker",
   "license": "MIT",
   "dependencies": {
     "axios": "^0.26.0",
+    "blake2": "^4.1.1",
+    "fs": "^0.0.1-security",
+    "nanocurrency-web": "^1.3.6",
     "pad": "^3.2.0",
     "qrcode": "^1.5.0"
   }

@@ -1,6 +1,7 @@
 const pad = require('pad');
+const fs = require('fs');
 
-exports.nData = function(config) {
+exports.nProtocol = function(config) {
 	if (typeof config == 'undefined')
 		throw "Configuration object is required";
 	if (typeof config['node'] == 'undefined' && typeof config['nRpc'] == 'undefined')
@@ -26,6 +27,7 @@ exports.nData = function(config) {
 		        polling: config.polling
 		});
 	}
+	this.nTools = config['nTools'];
 	this.baseDataChars =
 		String.fromCharCode(9)  +  // Tab
 		String.fromCharCode(10) +  // Line feed
@@ -37,6 +39,9 @@ exports.nData = function(config) {
 		String.fromCharCode(8);    // Backspace
 		String.fromCharCode(127);  // Delete
 */
+	this.messages = [];
+	this.processing = false;
+	this.callback = null;
 	/**
 	 * Get NANO from raw amount
 	 * @param   {String} raw	Raw transaction amount.
@@ -214,16 +219,33 @@ exports.nData = function(config) {
 		}
 		return meta;
 	};
-	this.listen = function(account, callback) {
-	        this.nSub.subscribe(account, async (subject, message) => {
-			let isMeta = false;
-			if (message.type == 'receivable') {
-				isMeta = this.isMeta(account, message.data.amount);
+	this.processTransactions = async function() {
+        	if (this.processing == false && this.messages.length) {
+                	this.processing = true;
+                	let msg = this.messages.pop();
+                	if (msg.transaction.type == 'receivable') {
+                        	const signedBlock = await this.nTools.buildReceiveBlock(msg.transaction.data, msg.privateKey);
+                        	let result = await this.nRpc.processAsync('receive', signedBlock);
+                	}
+                	if (this.isMeta(msg.account, msg.transaction.data.amount) == true) {
+	                	let data = this.decodeMeta(msg.transaction.data.amount);
+				if (typeof msg.callback == 'function')
+					msg.callback(data);
 			}
-			if (isMeta) {
-				let data = this.decodeMeta(message.data.amount);
-				callback(data);
-			}
-	        });
+                	this.processing = false;
+	        }
 	};
+	this.listenTransactions = async function(account, privateKey, callback) {
+	        this.nSub.subscribe(account, async (subject, transaction) => {
+        	        this.messages.push({
+                	        account: account,
+                        	subject: subject,
+	                        transaction: transaction,
+				privateKey: privateKey,
+				callback: callback
+        	        });
+        	});
+        	this.nSub.start();
+	};
+	setInterval(this.processTransactions.bind(this), 1000);
 };
