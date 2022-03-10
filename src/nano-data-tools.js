@@ -85,4 +85,7 @@ exports.nTools = function(config) {
 	        }
         	return raw;
 	};
+	this.validateAddress = function(address) {
+		return nWebTools.validateAddress(address);
+	};
 };
