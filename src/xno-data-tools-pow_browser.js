@@ -1,13 +1,18 @@
-const { parentPort } = require('worker_threads');
-const blake2 = require('blake2');
+const blake = require('blakejs');
 const crypto = require('crypto');
 
-let toByteArray = function(hexString) {
+let toByteArray = function(hexString, endianness) {
 	var result = [];
-	for (var i = 0; i < hexString.length; i += 2) {
-		result.push(parseInt(hexString.substr(i, 2), 16));
+	if (endianness == 'big') {
+		for (var i = 0; i < hexString.length; i += 2) {
+			result.push(parseInt(hexString.substr(i, 2), 16));
+		}
+	} else {
+		for (var i = hexString.length; i >= 0; i -= 2) {
+			result.push(parseInt(hexString.substr(i, 2), 16));
+		}
 	}
-	 return result;
+	return result;
 };
 /**
  * @param   {String}    nonce           - 8 byte hexedecimal nonce to test. Do not prepend '0x' marker.
@@ -16,12 +21,18 @@ let toByteArray = function(hexString) {
  */
 let powHash = function(nonce, blockHash) {
        	let hash = null;
-       	let h = blake2.createHash('blake2b', { digestLength: 8 });
-       	let i = Buffer.alloc(8);
-       	i.writeBigUInt64LE(BigInt(`0x${nonce}`), 0);
-       	h.update(i);
-     	h.update(Buffer.from(toByteArray(blockHash)));
-       	return h.digest().readBigUInt64LE().toString(16);
+	let h = blake.blake2bInit(8, null);
+	blake.blake2bUpdate(h, toByteArray(nonce, 'big'));
+	blake.blake2bUpdate(h, Buffer.from(toByteArray(blockHash, 'big')));
+	let result = blake.blake2bFinal(h);
+	let resultHash = "";
+	for (let x = 0; x < result.length; x++) {
+		let hex = Number(result[x]).toString(16);
+		if (hex.length == 1)
+			hex = `0${hex}`;
+		resultHash += hex;
+	}
+	return resultHash;
 };
 /**
  * @param   {String}    nonce           - 8 byte hexedecimal nonce to test. Do not prepend '0x' marker.
@@ -41,12 +52,15 @@ let powTest = function(nonce, blockHash, threshold) {
  * @param   {String}	hash		- Hexadecimal block hash.
  * @param   {String}	threshold	- 8 byte hexadecimal threshold that nonce must exceed.
  * @param   {function}	callback	- Progress callback for every 1,000,000 hash attempts.
+ * @param   {Number}	limit		- (Optional) Invoke callback every 'limit' of attempts.
  * @returns {Object}	o		- Result object.
  *			o.nonce		- 8 byte hexadecimal nonce.
  *			o.difficulty	- 8 byte hexadecimal difficulty, resulting hash, that was produced.
  *			o.threshold	- 8 byte hexadecimal threshold that difficulty exceeded.
  */
-let pow = async function(hash, threshold, callback) {
+let pow = async function(hash, threshold, callback, limit) {
+	if (typeof limit == 'undefined')
+		limit = 1000000;
        	let promise = new Promise(async (resolve, reject) => {
                 let x = 0;
                	let nonce = null;
@@ -54,9 +68,13 @@ let pow = async function(hash, threshold, callback) {
                 do {
                        	nonce = crypto.randomBytes(8);
                	        difficulty = powTest(nonce.toString('hex'), hash, threshold);
-       	                if (x++ > 1000000) {
+       	                if (x++ > limit) {
                                 if (typeof callback == 'function')
-                               	        await callback();
+                               	        await callback({
+						nonce: nonce.toString('hex'),
+						difficulty: difficulty,
+						threshold: threshold
+					});
                        	        x = 0;
                	        }
        	        } while(difficulty == null)
@@ -70,9 +88,9 @@ let pow = async function(hash, threshold, callback) {
 };
 
 
-parentPort.once('message', async (message) => {
-	let nonced = await pow(message.hash, message.threshold, () => {
-		parentPort.postMessage({ type: 'status', data: null });
-	});
-	parentPort.postMessage({ type: 'result', data: nonced });
-});
+self.addEventListener('message', async function(event) {
+	let nonced = await pow(event.data.hash, event.data.threshold, (data) => {
+		self.postMessage({ type: 'status', data: data });
+	}, event.data.limit);
+	self.postMessage({ type: 'result', data: nonced });
+}, false);

@@ -12,7 +12,7 @@ exports.nProtocol = function(config) {
 	this.axios = (typeof config['axios'] != 'undefined') ? config.axios : require('axios');
 	this.nRpc = config['nRpc'];
 	if (typeof this.nRpc == 'undefined') {
-		const nanoRpcClient = require('nano-rpc-client');
+		const nanoRpcClient = require('xno-rpc-client');
                 this.nRpc = new nanoRpcClient.nRpc({
                         node: config.node['node'],
                         axios: this.axios,
@@ -21,7 +21,7 @@ exports.nProtocol = function(config) {
 	}
 	this.nSub = config['nSub'];
 	if (typeof this.nSub == 'undefined') {
-		const nanoRpcSubscribe = require('nano-rpc-subscribe');
+		const nanoRpcSubscribe = require('xno-rpc-subscribe');
 		this.nSub = new nanoRpcSubscribe.nSub({
 		        nRpc: this.nRpc,
 		        polling: config.polling
