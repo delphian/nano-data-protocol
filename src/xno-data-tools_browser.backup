@@ -1,6 +1,10 @@
 const pad = require('pad');
 const { wallet, block: nWebBlock, tools: nWebTools } = require('nanocurrency-web');
+const { nPowTest, nPowHash, nPowToByteArray } = require('./xno-data-tools-pow-common');
 
+exports.nPowTest = nPowTest;
+exports.nPowHash = nPowHash;
+exports.nPowToByteArray = nPowToByteArray;
 exports.nTools = function(config) {
 	if (typeof config == 'undefined')
 		throw "Configuration object is required";
@@ -31,7 +35,7 @@ exports.nTools = function(config) {
 	 * @param   {String}    hash            - Hexadecimal block hash.
 	 * @param   {String}    threshold       - 8 byte hexadecimal threshold that nonce must exceed.
 	 * @param   {Object}    c	        - Force pass by reference.
-	 @ @param   {Boolean}	c.cancel	- Cancel the promise (force a reject and end the workers).
+	 * @param   {Boolean}	c.cancel	- Cancel the promise (force a reject and end the workers).
 	 * @param   {function}  callback        - Progress callback for every 1,000,000 hash attempts.
 	 * @param   {Number}    limit           - (Optional) Invoke callback every 'limit' of attempts.
  	 * @returns {Object}    o               - Result object.

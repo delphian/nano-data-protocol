@@ -1,7 +1,12 @@
+const nodejs = (typeof process === 'object' && process.title === 'node') ? true : false;
+const { Worker: NodeWorker } = require('worker_threads');
 const pad = require('pad');
 const { wallet, block: nWebBlock, tools: nWebTools } = require('nanocurrency-web');
-const { Worker } = require('worker_threads');
+const { nPowTest, nPowHash, nPowToByteArray } = require('./xno-data-tools-pow-common');
 
+exports.nPowTest = nPowTest;
+exports.nPowHash = nPowHash;
+exports.nPowToByteArray = nPowToByteArray;
 exports.nTools = function(config) {
 	if (typeof config == 'undefined')
 		throw "Configuration object is required";
@@ -27,29 +32,61 @@ exports.nTools = function(config) {
 	this.shortHash = function(hash) {
 		return `...${hash.substr(-12)}`;
 	};
-	/**
-	 * Find 8 byte proof of work nonce for a block hash.
-	 * @param   {String}    hash            - Hexadecimal block hash.
-	 * @param   {String}    threshold       - 8 byte hexadecimal threshold that nonce must exceed.
-	 * @param   {function}  callback        - Progress callback for every 1,000,000 hash attempts.
- 	 * @returns {Object}    o               - Result object.
-	 *                      o.nonce         - 8 byte hexadecimal nonce.
-	 *                      o.difficulty    - 8 byte hexadecimal difficulty, resulting hash, that was produced.
-	 *                      o.threshold     - 8 byte hexadecimal threshold that difficulty exceeded.
-	 */
-	this.pow = async function(hash, threshold, callback) {
+        /**
+         * Find 8 byte proof of work nonce for a block hash.
+         * @param   {String}    hash            - Hexadecimal block hash.
+         * @param   {String}    threshold       - 8 byte hexadecimal threshold that nonce must exceed.
+         * @param   {Object}    c               - Force pass by reference.
+         * @param   {Boolean}   c.cancel        - Cancel the promise (force a reject and end the workers).
+         * @param   {function}  callback        - Progress callback for every 1,000,000 hash attempts.
+         * @param   {Number}    limit           - (Optional) Invoke callback every 'limit' of attempts.
+         * @returns {Object}    o               - Result object.
+         *                      o.nonce         - 8 byte hexadecimal nonce.
+         *                      o.difficulty    - 8 byte hexadecimal difficulty, resulting hash, that was produced.
+         *                      o.threshold     - 8 byte hexadecimal threshold that difficulty exceeded.
+         */
+        this.pow = async function(hash, threshold, c, callback, limit) {
 		let promise = new Promise((resolve, reject) => {
-			const worker = new Worker(`${__dirname}/xno-data-tools-pow.js`);
-			worker.on('message', (message) => {
-				if (message.type == 'status')
-					callback(message);
-				if (message.type == 'result')
-					resolve(message.data);
-			});
-			worker.postMessage({
-				hash: hash,
-				threshold: threshold
-			});
+			if (nodejs) {
+				const worker = new NodeWorker(`${__dirname}/xno-data-tools-pow.js`);
+				worker.on('message', (message) => {
+					if (message.type == 'status')
+						callback(message);
+					if (message.type == 'result')
+						resolve(message.data);
+				});
+				worker.postMessage({
+					hash: hash,
+					threshold: threshold
+				});
+			} else {
+                        	let workers = [];
+                        	let maxWorkers = navigator.hardwareConcurrency || 4;
+                        	for (let x = 0; x < maxWorkers; x++) {
+                        	        const worker = new Worker(`/scripts/xno-data-tools-pow.js`);
+                	                worker.onmessage = (event) => {
+        	                                if (event.data.type == 'status') {
+	                                                callback(event.data);
+                                                	if (c.cancel == true) {
+                                        	                for (let y = 0; y < workers.length; y++)
+                                	                                workers[y].terminate();
+                        	                                reject({ status: 'canceled' });
+                	                                }
+        	                                }
+	                                        if (event.data.type == 'result') {
+                                        	        resolve(event.data);
+                                	                for (let y = 0; y < workers.length; y++)
+                        	                                workers[y].terminate();
+                	                        }
+        	                        };
+	                                worker.postMessage({
+                                        	hash: hash,
+                                	        threshold: threshold,
+                        	                limit: limit
+                	                });
+        	                        workers.push(worker);
+	                        }
+			}
 		});
 		return promise;
 	};

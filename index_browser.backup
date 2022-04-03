@@ -1,4 +1,4 @@
-const { nTools, nPowTest, nPowHash, nPowToByteArray } = require('./src/xno-data-tools');
+const { nTools, nPowTest, nPowHash, nPowToByteArray } = require('./src/xno-data-tools_browser');
 const NanoDataProtocol = require('./src/xno-data-protocol');
 
 exports.nPowTest = nPowTest;

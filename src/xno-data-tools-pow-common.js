@@ -2,14 +2,14 @@ const blake = require('blakejs');
 const crypto = require('crypto');
 
 let toByteArray = function(hexString, endianness) {
-	var result = [];
+	var result = new Uint8Array(hexString.length / 2);
 	if (endianness == 'big') {
 		for (var i = 0; i < hexString.length; i += 2) {
-			result.push(parseInt(hexString.substr(i, 2), 16));
+			result[i / 2] = parseInt(hexString.substr(i, 2), 16);
 		}
 	} else {
 		for (var i = hexString.length; i >= 0; i -= 2) {
-			result.push(parseInt(hexString.substr(i, 2), 16));
+			result[hexString.length - (i / 2)] = parseInt(hexString.substr(i, 2), 16);
 		}
 	}
 	return result;
@@ -23,10 +23,10 @@ let powHash = function(nonce, blockHash) {
        	let hash = null;
 	let h = blake.blake2bInit(8, null);
 	blake.blake2bUpdate(h, toByteArray(nonce, 'big'));
-	blake.blake2bUpdate(h, Buffer.from(toByteArray(blockHash, 'big')));
+	blake.blake2bUpdate(h, toByteArray(blockHash, 'big'));
 	let result = blake.blake2bFinal(h);
 	let resultHash = "";
-	for (let x = 0; x < result.length; x++) {
+	for (let x = result.length - 1; x >= 0; x--) {
 		let hex = Number(result[x]).toString(16);
 		if (hex.length == 1)
 			hex = `0${hex}`;
@@ -71,7 +71,7 @@ let pow = async function(hash, threshold, callback, limit) {
        	                if (x++ > limit) {
                                 if (typeof callback == 'function')
                                	        await callback({
-						nonce: nonce.toString('hex'),
+						nonce: nonce.reverse().toString('hex'),
 						difficulty: difficulty,
 						threshold: threshold
 					});
@@ -79,7 +79,7 @@ let pow = async function(hash, threshold, callback, limit) {
                	        }
        	        } while(difficulty == null)
                 resolve({
-                       	nonce: nonce.toString('hex'),
+                       	nonce: nonce.reverse().toString('hex'),
                        	difficulty: difficulty,
                        	threshold: threshold
                	});
@@ -87,10 +87,7 @@ let pow = async function(hash, threshold, callback, limit) {
        	return promise;
 };
 
-
-self.addEventListener('message', async function(event) {
-	let nonced = await pow(event.data.hash, event.data.threshold, (data) => {
-		self.postMessage({ type: 'status', data: data });
-	}, event.data.limit);
-	self.postMessage({ type: 'result', data: nonced });
-}, false);
+exports.nPowToByteArray = toByteArray;
+exports.nPowHash = powHash;
+exports.nPowTest = powTest;
+exports.nPow = pow;
