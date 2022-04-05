@@ -7,6 +7,22 @@ const { nPowTest, nPowHash, nPowToByteArray } = require('./xno-data-tools-pow-co
 exports.nPowTest = nPowTest;
 exports.nPowHash = nPowHash;
 exports.nPowToByteArray = nPowToByteArray;
+/**
+ * Shorten an account address
+ * @param   {String}    account         - Account address.
+ * @returns {String}                    - Shortened display version of account.
+ */
+exports.xnoShortAccount = function(account) {
+	return `...${account.substr(-12)}`;
+};
+/**
+ * Shorten a block hash
+ * @param   {String}	hash		- Block hash.
+ * @returns {String}			- Shortened display versino of block hash.
+ */
+exports.xnoShortHash = function(hash) {
+	return `...${hash.substr(-12)}`;
+};
 exports.nTools = function(config) {
 	if (typeof config == 'undefined')
 		throw "Configuration object is required";
@@ -16,22 +32,6 @@ exports.nTools = function(config) {
                 let NanoRpcClient = require('xno-rpc-client');
                 this.nRpc = new NanoRpcClient.nRpc();
         }
-	/**
-	 * Shorten an account address
-	 * @param   {String}	account		- Account address.
-	 * @returns {String}			- Shortened display version of account.
-	 */
-	this.shortAccount = function(account) {
-		return `...${account.substr(-12)}`;
-	};
-	/**
-	 * Shorten a block hash
-	 * @param   {String}	hash		- Block hash.
-	 * @returns {String}			- Shortened display versino of block hash.
-	 */
-	this.shortHash = function(hash) {
-		return `...${hash.substr(-12)}`;
-	};
         /**
          * Find 8 byte proof of work nonce for a block hash.
          * @param   {String}    hash            - Hexadecimal block hash.

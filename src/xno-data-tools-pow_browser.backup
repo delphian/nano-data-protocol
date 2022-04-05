@@ -1,8 +1,0 @@
-const { nPow } = require('./xno-data-tools-pow-common');
-
-self.addEventListener('message', async function(event) {
-	let nonced = await nPow(event.data.hash, event.data.threshold, (data) => {
-		self.postMessage({ type: 'status', data: data });
-	}, event.data.limit);
-	self.postMessage({ type: 'result', data: nonced });
-}, false);
