@@ -1,41 +1,64 @@
 const blake = require('blakejs');
 const crypto = require('crypto');
 
-let toByteArray = function(hexString, endianness) {
+function bnToBuf(bn) {
+  var hex = BigInt(bn).toString(16);
+  if (hex.length % 2) { hex = '0' + hex; }
+
+  var len = hex.length / 2;
+  var u8 = new Uint8Array(len);
+
+  var i = 0;
+  var j = 0;
+  while (i < len) {
+    u8[i] = parseInt(hex.slice(j, j+2), 16);
+    i += 1;
+    j += 2;
+  }
+
+  return u8;
+}
+
+function bufToBn(buf) {
+  var hex = [];
+  u8 = Uint8Array.from(buf);
+
+  u8.forEach(function (i) {
+    var h = i.toString(16);
+    if (h.length % 2) { h = '0' + h; }
+    hex.push(h);
+  });
+
+  return BigInt('0x' + hex.join(''));
+}
+
+let toHexString = function(byteArray) {
+  return Array.from(byteArray, function(byte) {
+    return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+  }).join('')
+};
+
+let toByteArray = function(hexString) {
 	var result = new Uint8Array(hexString.length / 2);
-	if (endianness == 'big') {
-		for (var i = 0; i < hexString.length; i += 2) {
-			result[i / 2] = parseInt(hexString.substr(i, 2), 16);
-		}
-	} else {
-		for (var i = hexString.length; i >= 0; i -= 2) {
-			result[hexString.length - (i / 2)] = parseInt(hexString.substr(i, 2), 16);
-		}
+	for (var i = 0; i < hexString.length; i += 2) {
+		result[i / 2] = parseInt(hexString.substr(i, 2), 16);
 	}
 	return result;
 };
 /**
- * @param   {String}    nonce           - 8 byte hexedecimal nonce to test. Do not prepend '0x' marker.
- * @param   {String}    blockHash       - 32 byte hexadecimal block hash. Do not prepend '0x' marker.
- * @returns {String}                    - 8 byte hexadecimal hash.
+ * @param   {Buffer}     nonce           - 8 byte buffer Nonce to test.
+ * @param   {String}     blockHash       - 32 byte hexadecimal block hash. Do not prepend '0x' marker.
+ * @returns {String}                     - 8 byte hexadecimal (16 characters) Blake2b hash.
  */
 let powHash = function(nonce, blockHash) {
-       	let hash = null;
 	let h = blake.blake2bInit(8, null);
-	blake.blake2bUpdate(h, toByteArray(nonce, 'big'));
-	blake.blake2bUpdate(h, toByteArray(blockHash, 'big'));
+	blake.blake2bUpdate(h, nonce.reverse());
+	blake.blake2bUpdate(h, toByteArray(blockHash));
 	let result = blake.blake2bFinal(h);
-	let resultHash = "";
-	for (let x = result.length - 1; x >= 0; x--) {
-		let hex = Number(result[x]).toString(16);
-		if (hex.length == 1)
-			hex = `0${hex}`;
-		resultHash += hex;
-	}
-	return resultHash;
+	return toHexString(result.reverse());
 };
 /**
- * @param   {String}    nonce           - 8 byte hexedecimal nonce to test. Do not prepend '0x' marker.
+ * @param   {Buffer}    nonce           - 8 byte buffer nonce to test.
  * @param   {String}    blockHash       - 32 byte hexadecimal block hash. Do not prepend '0x' marker.
  * @param   {String}    threshold       - 8 byte hexadecimal threshold blake2 digest must exceed. Do not prepend '0x' marker.
  * @returns {String}                    - 8 byte hexadecimal hash if nonce exceeds threshold, null otherwise.
@@ -58,7 +81,7 @@ let powTest = function(nonce, blockHash, threshold) {
  *			o.difficulty	- 8 byte hexadecimal difficulty, resulting hash, that was produced.
  *			o.threshold	- 8 byte hexadecimal threshold that difficulty exceeded.
  */
-let pow = async function(hash, threshold, callback, limit) {
+let powWorker = async function(hash, threshold, callback, limit) {
 	if (typeof limit == 'undefined')
 		limit = 1000000;
        	let promise = new Promise(async (resolve, reject) => {
@@ -67,11 +90,11 @@ let pow = async function(hash, threshold, callback, limit) {
        	        let difficulty = null;
                 do {
                        	nonce = crypto.randomBytes(8);
-               	        difficulty = powTest(nonce.toString('hex'), hash, threshold);
+               	        difficulty = powTest(nonce, hash, threshold);
        	                if (x++ > limit) {
                                 if (typeof callback == 'function')
                                	        await callback({
-						nonce: nonce.reverse().toString('hex'),
+						nonce: toHexString(nonce),
 						difficulty: difficulty,
 						threshold: threshold
 					});
@@ -79,7 +102,7 @@ let pow = async function(hash, threshold, callback, limit) {
                	        }
        	        } while(difficulty == null)
                 resolve({
-                       	nonce: nonce.reverse().toString('hex'),
+                       	nonce: toHexString(nonce),
                        	difficulty: difficulty,
                        	threshold: threshold
                	});
@@ -87,7 +110,8 @@ let pow = async function(hash, threshold, callback, limit) {
        	return promise;
 };
 
-exports.nPowToByteArray = toByteArray;
-exports.nPowHash = powHash;
-exports.nPowTest = powTest;
-exports.nPow = pow;
+
+exports.xnoToByteArray = toByteArray;
+exports.xnoPowHash = powHash;
+exports.xnoPowTest = powTest;
+exports.xnoPowWorker = powWorker;
